@@ -17,6 +17,9 @@ sealed class Screen(val route: String) {
     object ShowQR : Screen("show_qr/{qrCodeId}") {
         fun createRoute(qrCodeId: Long) = "show_qr/$qrCodeId"
     }
+    object Barcode : Screen("barcode/{content}") {
+        fun createRoute(content: String) = "barcode/$content"
+    }
 }
 
 const val generateRoute = "generate/{type}"

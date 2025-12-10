@@ -14,6 +14,7 @@ import com.qrmaster.ui.generate.GenerateScreen
 import com.qrmaster.ui.history.HistoryScreen
 import com.qrmaster.ui.home.HomeScreen
 import com.qrmaster.ui.onboarding.OnboardingScreen
+import com.qrmaster.ui.productInfor.BarcodeScreen
 import com.qrmaster.ui.scanner.ScannerScreen
 import com.qrmaster.ui.settings.SettingsScreen
 import com.qrmaster.ui.showqr.ShowQRScreen
@@ -70,6 +71,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onNavigateToShowQR = { qrCodeId ->
                     navController.navigate(Screen.ShowQR.createRoute(qrCodeId))
+                },
+                onNavigateToBarcode = { content ->
+                    navController.navigate("barcode/$content")
                 }
             )
         }
@@ -146,6 +150,18 @@ fun NavGraph(navController: NavHostController) {
                 onNavigateToShowQR = { qrCodeId ->
                     navController.navigate(Screen.ShowQR.createRoute(qrCodeId))
                 },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.Barcode.route,
+            arguments = listOf(
+                navArgument("content") { type = NavType.StringType }
+            )) { backStackEntry ->
+            val content = backStackEntry.arguments?.getString("content") ?: "0"
+            BarcodeScreen(
+                content = content,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

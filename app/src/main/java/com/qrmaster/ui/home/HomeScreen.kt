@@ -100,6 +100,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToScanner: () -> Unit,
     onNavigateToShowQR: (Long) -> Unit,
+    onNavigateToBarcode: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -114,6 +115,7 @@ fun HomeScreen(
     val currentCamera = remember { mutableStateOf<Camera?>(null) }
     val icheckInfo by viewModel.icheckInfo.collectAsState()
     val isLoadingICheck by viewModel.isLoadingICheck.collectAsState()
+    val navigateToBarcodeContent by viewModel.navigateToBarcodeContent.collectAsState()
 
     // Permission states
     var hasPermission by remember {
@@ -222,6 +224,13 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(navigateToBarcodeContent) {
+        navigateToBarcodeContent?.let { content ->
+            onNavigateToBarcode(content)
+            viewModel.clearBarcodeNavigation()
+        }
+    }
+
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -289,11 +298,11 @@ fun HomeScreen(
                     Toast.makeText(context, "Chụp ảnh", Toast.LENGTH_SHORT).show()
                 }
             )
-            ICheckResultDialog(
-                info = icheckInfo,
-                isLoading = isLoadingICheck,
-                onDismiss = { viewModel.clearICheckInfo() }
-            )
+//            ICheckResultDialog(
+//                info = icheckInfo,
+//                isLoading = isLoadingICheck,
+//                onDismiss = { viewModel.clearICheckInfo() }
+//            )
         }
     }
 }
@@ -601,7 +610,7 @@ fun ICheckResultDialog(
                         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                             Text("Tên sản phẩm:", fontWeight = FontWeight.Medium)
                             Text(
-                                it.name,
+                                it.name ?: "Không có thông tin",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -609,7 +618,7 @@ fun ICheckResultDialog(
                             Spacer(Modifier.height(12.dp))
                             Text("Xuất xứ:", fontWeight = FontWeight.Medium)
                             Text(
-                                it.origin,
+                                it.origin ?: "Không có thông tin",
                                 fontSize = 17.sp,
                                 color = MaterialTheme.colorScheme.secondary
                             )

@@ -1,8 +1,12 @@
 package com.qrmaster.ui.home
 
+import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import com.qrmaster.domain.model.ICheckProductInfo
 import com.qrmaster.domain.model.QrCodeData
 import com.qrmaster.domain.model.QrCodeType
@@ -14,7 +18,9 @@ import com.qrmaster.domain.usecase.ScanICheckBarcodeUseCase
 import com.qrmaster.domain.usecase.ScanQrFromUriUseCase
 import com.qrmaster.ui.settings.SettingsPreferences
 import com.qrmaster.utils.FeedbackManager
+import com.qrmaster.utils.detectQrCodeType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +40,8 @@ class HomeViewModel @Inject constructor(
     private val scanQrFromUriUseCase: ScanQrFromUriUseCase,
     private val feedbackManager: FeedbackManager,
     private val scanICheckBarcodeUseCase: ScanICheckBarcodeUseCase,
-    private val settingsPreferences: SettingsPreferences
+    private val settingsPreferences: SettingsPreferences,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _recentQrCodes = MutableStateFlow<List<QrCodeData>>(emptyList())
@@ -77,6 +84,10 @@ class HomeViewModel @Inject constructor(
     private val _scanFeedback = MutableStateFlow<ScanFeedback?>(null)
     val scanFeedback = _scanFeedback.asStateFlow()
 
+    private val _navigateToBarcodeContent = MutableStateFlow<String?>(null)
+    val navigateToBarcodeContent = _navigateToBarcodeContent.asStateFlow()
+
+
     init {
         _navigateToShowQr.value = null
         loadRecentQrCodes()
@@ -117,6 +128,7 @@ class HomeViewModel @Inject constructor(
                 scanICheckBarcodeUseCase(content)
                     .onSuccess { info ->
                         _icheckInfo.value = info
+                        _navigateToBarcodeContent.value = content
                     }
                     .onFailure {
                         // log
@@ -134,6 +146,15 @@ class HomeViewModel @Inject constructor(
 
             feedbackManager.playScanSuccess(vibrate = vibrate, beep = beep)
         }
+    }
+
+    fun clearBarcodeNavigation(){
+        _navigateToBarcodeContent.value = null
+        _isFlashOn.value = false
+        _icheckInfo.value = null
+        _isScanning.value = true  // Reset để tiếp tục quét
+        _scannedQrCodeResult.value = null  // Clear nội dung cũ
+        lastScanned = null  // Reset để tránh skip QR trùng lặp
     }
 
     fun toggleFlash() {
@@ -158,29 +179,34 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onImagePickedFromGallery(uri: Uri) {
-//        viewModelScope.launch {
-//            val content = scanQrFromUriUseCase(uri)
-//            content?.let {
-//                onQrCodeScannedRealtime(content)
-//            } ?: run {
-//                _errorMessage.value = "Lỗi khi quét mã QR từ ảnh"
-//            }
-//        }
+        viewModelScope.launch {
+            try {
+                val inputImage = InputImage.fromFilePath(context, uri)
+                val barcodeScanner = BarcodeScanning.getClient()
+                barcodeScanner.process(inputImage)
+                    .addOnSuccessListener { barcodes ->
+                        barcodes.firstOrNull()?.let { barcode ->
+                            val type = detectQrCodeType(barcode)
+                            val content = barcode.rawValue.orEmpty()
+                            if (content.isNotBlank()) {
+                                onQrCodeScannedRealtime(content, type)
+                            } else {
+                                _errorMessage.value = "Không tìm thấy mã QR hoặc Barcode trong ảnh."
+                            }
+                        } ?: run {
+                            _errorMessage.value = "Không tìm thấy mã QR hoặc Barcode trong ảnh."
+                        }
+                    }
+                    .addOnFailureListener { exception ->
+                        _errorMessage.value = "Lỗi khi quét mã từ ảnh: ${exception.message}"
+                    }
+            }catch (e: Exception){
+                _errorMessage.value = "Lỗi khi quét mã QR từ ảnh: ${e.message}"
+            }
+        }
     }
 
     fun clearError() {
         _errorMessage.value = null
-    }
-
-    fun clearScanFeedback() {
-        _scanFeedback.value = null
-    }
-
-    fun clearICheckInfo() {
-        _isFlashOn.value = false
-        _icheckInfo.value = null
-        _isScanning.value = true  // Reset để tiếp tục quét
-        _scannedQrCodeResult.value = null  // Clear nội dung cũ
-        lastScanned = null  // Reset để tránh skip QR trùng lặp
     }
 }
